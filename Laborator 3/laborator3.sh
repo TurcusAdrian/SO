@@ -1,30 +1,19 @@
-#!/bin/bash
-
-echo "$1 $2"
-
-dir=$1
-
-mod=$2
+##!/bin/bash
 
 
-for file in "$dir"/*.txt; do
+dir="$1"
+mod="$2"
 
-if [ "$mod" == "x" ]
-then chmod +$mod "$file"
-fi
-
-if [ "$mod" == "r" ]
-then chmod +$mod "$file"
-fi
-
-if [ "$mod" == "w" ]
-then chmod +$mod "$file"
-fi
-done
-
-
-for director in "$dir"/*; do
-if [ -d "$dir" ]
-then bash $0 $dir $mod
-fi
+for file in "$dir"/*; do
+    if [ -f "$file" ] && [[ "$file" == *.txt ]]; then
+        if [ "$mod" == "x" ]; then
+            chmod +x "$file"
+        elif [ "$mod" == "r" ]; then
+            chmod +r "$file"
+        elif [ "$mod" == "w" ]; then
+            chmod +w "$file"
+        fi
+    elif [ -d "$file" ]; then
+        bash "$0" "$file" "$mod"
+    fi
 done
