@@ -1,0 +1,4 @@
+numar litere mici: 40
+numar litere mari: 15
+numar cifre: 24
+numar aparitii caracter: 8
