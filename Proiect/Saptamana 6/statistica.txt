@@ -1,0 +1,10 @@
+nume fisier: imagine.bmp
+inaltime: 1280
+lungime: 1920
+dimensiune: 7372800
+identificatorul utilizatorului: 1000
+timpul ultimei modificari: 1700157838
+contorul de legaturi: 1
+Drepturi de acces user: RW-
+Drepturi de acces grup: R--
+Drepturi de acces altii: R--

@@ -8,58 +8,92 @@
 #include <time.h>
 
 
-#define SIZE 4096
+#define BMP_HEADER_SIZE 54
 
-char *obtine_permisiuni(mode_t mode) {
-    static char permisiuni[10];
-    strcpy(permisiuni, "---------");
-    if (mode & S_IRUSR) permisiuni[0] = 'R';
-    if (mode & S_IWUSR) permisiuni[1] = 'W';
-    if (mode & S_IXUSR) permisiuni[2] = 'X';
-    if (mode & S_IRGRP) permisiuni[3] = 'R';
-    if (mode & S_IWGRP) permisiuni[4] = 'W';
-    if (mode & S_IXGRP) permisiuni[5] = 'X';
-    if (mode & S_IROTH) permisiuni[6] = 'R';
-    if (mode & S_IWOTH) permisiuni[7] = 'W';
-    if (mode & S_IXOTH) permisiuni[8] = 'X';
-    return permisiuni;
+typedef struct {
+    char signature[2];
+    int size;
+    int reserved;
+    int offset;
+} BMPHeader;
+ 
+typedef struct {
+    int header_size;
+    int width;
+    int height;
+    int planes;
+    int bpp;
+    int compression;
+    int image_size;
+    int x_pixels_per_meter;
+    int y_pixels_per_meter;
+    int colors_used;
+    int colors_important;
+}InfoHeader;
+
+
+char *obtine_permisiuni_user(mode_t mode) {
+    static char permisiuni_user[3];
+    strcpy(permisiuni_user, "---");
+    if (mode & S_IRUSR) permisiuni_user[0] = 'R';
+    if (mode & S_IWUSR) permisiuni_user[1] = 'W';
+    if (mode & S_IXUSR) permisiuni_user[2] = 'X';
+    return permisiuni_user;
 }
 
-
-int main(int argc, char **argv) {
-
+char *obtine_permisiuni_grup(mode_t mode) {
+    static char permisiuni_grup[3];
+    strcpy(permisiuni_grup, "---");
     
+    if (mode & S_IRGRP) permisiuni_grup[3] = 'R';
+    if (mode & S_IWGRP) permisiuni_grup[4] = 'W';
+    if (mode & S_IXGRP) permisiuni_grup[5] = 'X';
+    return permisiuni_grup;
+}
+
+char *obtine_permisiuni_other(mode_t mode) {
+    static char permisiuni_other[3];
+    strcpy(permisiuni_other, "---");
+    if (mode & S_IROTH) permisiuni_other[0] = 'R';
+    if (mode & S_IWOTH) permisiuni_other[1] = 'W';
+    if (mode & S_IXOTH) permisiuni_other[2] = 'X';
+    return permisiuni_other;
+}
+
+char* get_file_name(char **argv){
+    
+    return argv[1];
+}
+
+void verificare_argumente(int argc, char **argv) {
+     
     if (argc > 2) {
         perror("Usage: ./program <input_file>");
         exit(-1);
     }
 
-    char *file_name = argv[1];
-
    
-    if (strstr(file_name, ".bmp") == NULL) {
-        perror("File extension must be '.bmp'");
+    if (strstr(get_file_name(argv), ".bmp") == NULL) {
+        perror("Fisierul trebuie sa fie unul de tipul '.bmp' ");
         exit(-1);
     }
 
-    
-    int file_in = open(file_name, O_RDONLY);
+}
 
-    
-    int file_out = open("statistica.txt", O_WRONLY);
 
-    if (file_in == -1) {
-        perror("Could not open the file!\n");
-        exit(-1);
+void close_files(int file_input, int file_output){
+
+    if(close(file_input)==-1){
+        printf("Nu s-a putut inchide fisierul bmp primit ca argument!");
     }
 
-    char bytes_to_read[SIZE]; 
-    int nr = 0;
-    
+    if(close(file_output)==-1){
+        printf("Nu s-a putut inchide fisierul statistica.txt in care scriem!");
+    }
+}
 
-     //while((nr=read(file_in,bytes_to_read,SIZE))){
-        //printf("%s",bytes_to_read);
-     //}
+void scriere_in_fisier(int file_in,int file_out,char **argv){
+
 
     struct stat file_stat;
 
@@ -69,28 +103,34 @@ int main(int argc, char **argv) {
         close(file_out);
         exit(EXIT_FAILURE);
     }
+    
+    char bmp_header[BMP_HEADER_SIZE];
+    int bytes_read = read(file_in, bmp_header, BMP_HEADER_SIZE);
 
+    unsigned int width = *(unsigned int*)&bmp_header[18];  
+    unsigned int height = *(unsigned int*)&bmp_header[22]; 
+    unsigned int image_size = *(unsigned int*)&bmp_header[34]; 
 
     char nume_fisier[50];
-    sprintf(nume_fisier, "nume fisier: %s\n",file_name);
+    sprintf(nume_fisier, "nume fisier: %s\n",get_file_name(argv) );
     write(file_out,nume_fisier,strlen(nume_fisier));
 
 
 
     char inaltime_imagine[50];
-    sprintf(inaltime_imagine, "inaltime: %d\n",?);
+    sprintf(inaltime_imagine, "inaltime: %d\n",height);
     write(file_out,inaltime_imagine,strlen(inaltime_imagine));
 
 
 
     char lungime_imagine[50];
-    sprintf(lungime_imagine, "lungime: %d\n",?);
+    sprintf(lungime_imagine, "lungime: %d\n",width);
     write(file_out,lungime_imagine,strlen(lungime_imagine));
 
 
 
     char dimensiune_imagine[50];
-    sprintf(dimensiune_imagine, "dimensiune: %d\n",?);
+    sprintf(dimensiune_imagine, "dimensiune: %d\n",image_size);
     write(file_out,dimensiune_imagine,strlen(dimensiune_imagine));
 
 
@@ -117,30 +157,41 @@ int main(int argc, char **argv) {
 
 
     char drepturi_de_acces_user[50];
-    sprintf(drepturi_de_acces_user, "Drepturi de acces user: %s\n", obtine_permisiuni(file_stat.st_mode & S_IRWXU));
+    sprintf(drepturi_de_acces_user, "Drepturi de acces user: %s\n", obtine_permisiuni_user(file_stat.st_mode & S_IRWXU));
     write(file_out, drepturi_de_acces_user, strlen(drepturi_de_acces_user));
 
 
 
     char drepturi_de_acces_grup[50];
-    sprintf(drepturi_de_acces_grup, "Drepturi de acces grup: %s\n", obtine_permisiuni(file_stat.st_mode & S_IRWXG));
+    sprintf(drepturi_de_acces_grup, "Drepturi de acces grup: %s\n", obtine_permisiuni_grup(file_stat.st_mode & S_IRWXG));
     write(file_out, drepturi_de_acces_grup, strlen(drepturi_de_acces_grup));
 
 
 
     char drepturi_de_acces_altii[50];
-    sprintf(drepturi_de_acces_altii, "Drepturi de acces altii: %s\n", obtine_permisiuni(file_stat.st_mode & S_IRWXO));
+    sprintf(drepturi_de_acces_altii, "Drepturi de acces altii: %s\n", obtine_permisiuni_other(file_stat.st_mode & S_IRWXO));
     write(file_out, drepturi_de_acces_altii, strlen(drepturi_de_acces_altii));
 
+}
 
+int main(int argc, char **argv) {
 
-    if(close(file_in)==-1){
-        printf("Nu s-a putut inchide fisierul bmp primit ca argument!");
+    verificare_argumente(argc,argv);
+   
+    
+    int file_in = open(get_file_name(argv), O_RDONLY);
+
+    
+    int file_out = open("statistica.txt", O_WRONLY);
+
+    if (file_in == -1) {
+        perror("Nu se poate deschide fisierul!\n");
+        exit(-1);
     }
-
-    if(close(file_out)==-1){
-        printf("Nu s-a putut inchide fisierul statistica.txt in care scriem!");
-    }
+    
+    scriere_in_fisier(file_in,file_out,argv);
+   
+    close_files(file_in,file_out);
 
     return 0;
 }
