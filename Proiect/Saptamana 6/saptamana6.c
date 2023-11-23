@@ -33,7 +33,7 @@ typedef struct {
 
 
 char *obtine_permisiuni_user(mode_t mode) {
-    static char permisiuni_user[3];
+    static char permisiuni_user[4];
     strcpy(permisiuni_user, "---");
     if (mode & S_IRUSR) permisiuni_user[0] = 'R';
     if (mode & S_IWUSR) permisiuni_user[1] = 'W';
@@ -42,17 +42,17 @@ char *obtine_permisiuni_user(mode_t mode) {
 }
 
 char *obtine_permisiuni_grup(mode_t mode) {
-    static char permisiuni_grup[3];
+    static char permisiuni_grup[4];
     strcpy(permisiuni_grup, "---");
     
-    if (mode & S_IRGRP) permisiuni_grup[3] = 'R';
-    if (mode & S_IWGRP) permisiuni_grup[4] = 'W';
-    if (mode & S_IXGRP) permisiuni_grup[5] = 'X';
+    if (mode & S_IRGRP) permisiuni_grup[0] = 'R';
+    if (mode & S_IWGRP) permisiuni_grup[1] = 'W';
+    if (mode & S_IXGRP) permisiuni_grup[2] = 'X';
     return permisiuni_grup;
 }
 
 char *obtine_permisiuni_other(mode_t mode) {
-    static char permisiuni_other[3];
+    static char permisiuni_other[4];
     strcpy(permisiuni_other, "---");
     if (mode & S_IROTH) permisiuni_other[0] = 'R';
     if (mode & S_IWOTH) permisiuni_other[1] = 'W';
@@ -145,7 +145,7 @@ void scriere_in_fisier(int file_in,int file_out,char **argv){
     char timp_modificare_string[20];
     strftime(timp_modificare_string, sizeof(timp_modificare_string), "%d", timp_modificare);
     char timpul_ultimei_modificari[50];
-    sprintf(timpul_ultimei_modificari, "timpul ultimei modificari: %d\n",timp_modificare_string);
+    sprintf(timpul_ultimei_modificari, "timpul ultimei modificari: %s\n",timp_modificare_string);
     write(file_out,timpul_ultimei_modificari,strlen(timpul_ultimei_modificari));
         
 
