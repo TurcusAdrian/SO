@@ -299,18 +299,22 @@ void link_scriere_in_fisier(int file_in,int file_out, char* entry_name){
     sprintf(nume_legatura, "nume legatura: %s\n",entry_name);
     write(file_out,nume_legatura,strlen(nume_legatura));
 
-
     char dimensiune_legatura[50];
     sprintf(dimensiune_legatura, "dimensiune legatura: %d\n",file_stat.st_size);
     write(file_out,dimensiune_legatura,strlen(dimensiune_legatura));
 
-
+    struct stat s_link;
+    if(lstat(file_in,&s_link)!=0){
+        perror("Eroare la lstat!");
+        exit(EXIT_FAILURE);
+    }
+    char dimensiune_fisier_target[50];
+    sprintf(dimensiune_fisier_target,"dimensiune fisier target: %d",s_link.st_size);
+    write(file_out,dimensiune_fisier_target,strlen(dimensiune_fisier_target));
 
     char identificator_utilizator[50];
     sprintf(identificator_utilizator, "identificatorul utilizatorului: %d\n",file_stat.st_uid);
     write(file_out,identificator_utilizator,strlen(identificator_utilizator));
-
-
 
     struct tm *timp_modificare = localtime(&file_stat.st_mtime);
     char timp_modificare_string[20];
@@ -350,7 +354,7 @@ int main(int argc, char **argv) {
     verificare_argumente(argc,argv);
    
     DIR *directory=opendir(path_to_directory(argv));
-    
+
     int file_out = open("statistica.txt", O_WRONLY);
     
     struct dirent *entry;
@@ -389,7 +393,7 @@ int main(int argc, char **argv) {
         }
 
         if(S_ISLNK(file_stat.st_mode)){
-            link_scriere_in_fisier(open(file_path, O_RDONLY), file_out, entry->d_name);
+            link_scriere_in_fisier(open(file_path, O_RDONLY),file_out, entry->d_name);
             close_files(entry->d_name,file_out);
         }
 
