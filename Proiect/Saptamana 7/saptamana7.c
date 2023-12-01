@@ -160,7 +160,7 @@ void bmp_scriere_in_fisier(int file_in,int file_out,char* entry_name){
 
 
     char contorul_de_legaturi[50];
-    sprintf(contorul_de_legaturi, "contorul de legaturi: %d\n",file_stat.st_nlink);
+    sprintf(contorul_de_legaturi, "contorul de legaturi: %ld\n",file_stat.st_nlink);
     write(file_out,contorul_de_legaturi,strlen(contorul_de_legaturi));
     
 
@@ -200,7 +200,7 @@ void normal_scriere_in_fisier(int file_in,int file_out, char* entry_name){
 
 
     char dimensiune_fisier[50];
-    sprintf(dimensiune_fisier, "dimensiune: %d\n",file_stat.st_size);
+    sprintf(dimensiune_fisier, "dimensiune: %ld\n",file_stat.st_size);
     write(file_out,dimensiune_fisier,strlen(dimensiune_fisier));
 
 
@@ -221,7 +221,7 @@ void normal_scriere_in_fisier(int file_in,int file_out, char* entry_name){
 
 
     char contorul_de_legaturi[50];
-    sprintf(contorul_de_legaturi, "contorul de legaturi: %d\n",file_stat.st_nlink);
+    sprintf(contorul_de_legaturi, "contorul de legaturi: %ld\n",file_stat.st_nlink);
     write(file_out,contorul_de_legaturi,strlen(contorul_de_legaturi));
     
 
@@ -284,7 +284,7 @@ void director_scriere_in_fisier(int file_in,int file_out, char* entry_name){
     write(file_out, drepturi_de_acces_altii, strlen(drepturi_de_acces_altii));
 }
 
-void link_scriere_in_fisier(int file_in,int file_out, char* entry_name){
+void link_scriere_in_fisier(int file_in,int file_out, char* entry_name, const char* file_path){
     
     struct stat file_stat;
 
@@ -295,21 +295,24 @@ void link_scriere_in_fisier(int file_in,int file_out, char* entry_name){
         exit(EXIT_FAILURE);
     }
 
+    struct stat s_link;
+    
+    if(lstat(file_path,&s_link)!=0){
+        perror("Eroare la lstat!");
+        exit(EXIT_FAILURE);
+    }
+    
     char nume_legatura[50];
     sprintf(nume_legatura, "nume legatura: %s\n",entry_name);
     write(file_out,nume_legatura,strlen(nume_legatura));
 
     char dimensiune_legatura[50];
-    sprintf(dimensiune_legatura, "dimensiune legatura: %d\n",file_stat.st_size);
+    sprintf(dimensiune_legatura, "dimensiune legatura: %ld\n",s_link.st_size);
     write(file_out,dimensiune_legatura,strlen(dimensiune_legatura));
 
-    struct stat s_link;
-    if(lstat(file_in,&s_link)!=0){
-        perror("Eroare la lstat!");
-        exit(EXIT_FAILURE);
-    }
+    
     char dimensiune_fisier_target[50];
-    sprintf(dimensiune_fisier_target,"dimensiune fisier target: %d",s_link.st_size);
+    sprintf(dimensiune_fisier_target,"dimensiune fisier target: %ld\n",file_stat.st_size);
     write(file_out,dimensiune_fisier_target,strlen(dimensiune_fisier_target));
 
     char identificator_utilizator[50];
@@ -326,7 +329,7 @@ void link_scriere_in_fisier(int file_in,int file_out, char* entry_name){
 
 
     char contorul_de_legaturi[50];
-    sprintf(contorul_de_legaturi, "contorul de legaturi: %d\n",file_stat.st_nlink);
+    sprintf(contorul_de_legaturi, "contorul de legaturi: %ld\n",file_stat.st_nlink);
     write(file_out,contorul_de_legaturi,strlen(contorul_de_legaturi));
     
 
@@ -367,43 +370,44 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        char file_path[50];
+        char file_path[5000];
         snprintf(file_path, sizeof(file_path), "%s/%s", path_to_directory(argv), entry->d_name);
 
-        if (stat(file_path, &file_stat) == -1) {
+        if (lstat(file_path, &file_stat) == -1) {
             perror("Eroare la stat");
             continue;  //merge la urmatorul fisier
         }
+	
+	    if(S_ISLNK(file_stat.st_mode)){
+            link_scriere_in_fisier(open(file_path, O_RDONLY),file_out, entry->d_name,file_path);
+	        continue;
+        }
 
-        if (S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")) {
+        if(S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")){
             bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out, entry->d_name);
-            close_files(entry->d_name,file_out);
+            continue;
 
         }
 
         if(S_ISREG(file_stat.st_mode)){
             normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out, entry->d_name);
-            close_files(entry->d_name,file_out);
+            continue;
 
         }
         
         if(S_ISDIR(file_stat.st_mode)){
             director_scriere_in_fisier(open(file_path, O_RDONLY), file_out, entry->d_name);
-            close_files(entry->d_name,file_out);
-        }
-
-        if(S_ISLNK(file_stat.st_mode)){
-            link_scriere_in_fisier(open(file_path, O_RDONLY),file_out, entry->d_name);
-            close_files(entry->d_name,file_out);
+            continue;
         }
 
         else{
             printf("Tip de fisier necunoscut!\n");
             exit(EXIT_FAILURE);
         }
-
+        close_files(open(file_path, O_RDONLY), file_out);
     }   
-
+    closedir(directory);
+    close(file_out);
 
     return 0;
 }

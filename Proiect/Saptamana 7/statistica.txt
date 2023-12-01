@@ -1,0 +1,32 @@
+nume imagine: imagine.bmp
+inaltime: 1280
+lungime: 1920
+dimensiune: 7372800
+identificatorul utilizatorului: 1000
+timpul ultimei modificari: 16
+contorul de legaturi: 1
+Drepturi de acces user: RW-
+Drepturi de acces grup: R--
+Drepturi de acces altii: R--
+nume director: 2
+identificatorul utilizatorului: 1000
+Drepturi de acces user: RWX
+Drepturi de acces grup: R-X
+Drepturi de acces altii: R-X
+nume fisier: fisier.txt
+dimensiune: 2
+identificatorul utilizatorului: 1000
+timpul ultimei modificari: 30
+contorul de legaturi: 1
+Drepturi de acces user: RWX
+Drepturi de acces grup: R-X
+Drepturi de acces altii: R-X
+nume legatura: imagine.bamp
+dimensiune legatura: 10
+dimensiune fisier target: 2
+identificatorul utilizatorului: 1000
+timpul ultimei modificari: 30
+contorul de legaturi: 1
+Drepturi de acces user: RWX
+Drepturi de acces grup: R-X
+Drepturi de acces altii: R-X
