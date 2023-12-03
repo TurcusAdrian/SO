@@ -114,13 +114,12 @@ void close_directories(DIR *dir_input, DIR *dir_output){
     }
 }
 
-void bmp_convert_to_grey(int file_in, int file_out, char *entry_name) {
+void bmp_convert_to_grey(int file_in, char *entry_name) {
     struct stat file_stat;
 
     if (fstat(file_in, &file_stat) == -1) {
         perror("Eroare");
         close(file_in);
-        close(file_out);
         exit(EXIT_FAILURE);
     }
 
@@ -142,13 +141,12 @@ void bmp_convert_to_grey(int file_in, int file_out, char *entry_name) {
 
                 double grey = 0.299 * (double)pixel[0] + 0.587 * (double)pixel[1] + 0.114 * (double)pixel[2];
                 unsigned char grey_pixel[3] = {(unsigned char)grey, (unsigned char)grey, (unsigned char)grey};
-                write(file_out, grey_pixel, sizeof(grey_pixel));
+                write(file_in, grey_pixel, sizeof(grey_pixel));
             }
         }
     }
 
     close(file_in);
-    close(file_out);
     exit(EXIT_SUCCESS);
 }
 
@@ -450,6 +448,14 @@ int main(int argc, char **argv) {
                 perror("Eroare la procesul copil al symlink!\n");
                 exit(EXIT_FAILURE);
             }
+
+            int status_link=0;
+            waitpid(copil_link, &status_link, 0);
+
+            if (WIFEXITED(status_link)) {
+            int lines = WEXITSTATUS(status_link);
+
+            printf("Copilul a numarat %d linii.\n", lines);
 	        continue;
         }
 
@@ -471,7 +477,7 @@ int main(int argc, char **argv) {
 
             copil_bmp_gri=fork();
             if(copil_bmp_statis==0){
-                bmp_convert_to_grey(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+                bmp_convert_to_grey(open(file_path, O_RDONLY), entry->d_name);
                 exit(EXIT_SUCCESS);
             }
             else{
