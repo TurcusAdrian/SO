@@ -114,6 +114,44 @@ void close_directories(DIR *dir_input, DIR *dir_output){
     }
 }
 
+void bmp_convert_to_grey(int file_in, int file_out, char *entry_name) {
+    struct stat file_stat;
+
+    if (fstat(file_in, &file_stat) == -1) {
+        perror("Eroare");
+        close(file_in);
+        close(file_out);
+        exit(EXIT_FAILURE);
+    }
+
+    char bmp_header[BMP_HEADER_SIZE];
+    int bytes_read = read(file_in, bmp_header, BMP_HEADER_SIZE);
+
+    unsigned int width = *(unsigned int *)&bmp_header[18];
+    unsigned int height = *(unsigned int *)&bmp_header[22];
+    unsigned int image_size = *(unsigned int *)&bmp_header[34];
+
+    lseek(file_in, BMP_HEADER_SIZE, SEEK_SET);
+
+    if (bytes_read == BMP_HEADER_SIZE && width > 0 && height > 0) {
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                unsigned char pixel[3];
+                read(file_in, pixel, sizeof(pixel));
+                lseek(file_in, -3, SEEK_CUR);
+
+                double grey = 0.299 * (double)pixel[0] + 0.587 * (double)pixel[1] + 0.114 * (double)pixel[2];
+                unsigned char grey_pixel[3] = {(unsigned char)grey, (unsigned char)grey, (unsigned char)grey};
+                write(file_out, grey_pixel, sizeof(grey_pixel));
+            }
+        }
+    }
+
+    close(file_in);
+    close(file_out);
+    exit(EXIT_SUCCESS);
+}
+
 void bmp_scriere_in_fisier(int file_in,int file_out,char* entry_name){
 
 
@@ -405,6 +443,7 @@ int main(int argc, char **argv) {
 
             if(copil_link==0){
                 link_scriere_in_fisier(open(file_path, O_RDONLY),file_out_specific, entry->d_name,file_path);
+                execlp("wc", "wc", "-l", file_path, NULL);
                 exit(EXIT_SUCCESS);
             }
             else{
@@ -422,6 +461,7 @@ int main(int argc, char **argv) {
 
             if(copil_bmp_statis==0){
                 bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+                execlp("wc", "wc", "-l", file_path, NULL);
                 exit(EXIT_SUCCESS);
             }
             else{
@@ -431,7 +471,7 @@ int main(int argc, char **argv) {
 
             copil_bmp_gri=fork();
             if(copil_bmp_statis==0){
-                //functia de convertit in gri imaginea!
+                bmp_convert_to_grey(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
                 exit(EXIT_SUCCESS);
             }
             else{
@@ -451,6 +491,7 @@ int main(int argc, char **argv) {
 
             if(copil_regular==0){    
                 normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+                execlp("wc", "wc", "-l", file_path, NULL);
                 exit(EXIT_SUCCESS);
             }
             else{
@@ -469,6 +510,7 @@ int main(int argc, char **argv) {
 
             if(copil_dir==0){
                 director_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+                execlp("wc", "wc", "-l", file_path, NULL);
                 exit(EXIT_SUCCESS);
             }
             else{
