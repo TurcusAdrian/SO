@@ -81,7 +81,7 @@ int e_director(const char *path) {
 void verificare_argumente(int argc, char **argv) {
     
     if (argc != 3) {
-        printf("Usage: %s <directory_input> %s <directory_output>\n", path_to_directory_input(argv));
+      printf("Usage: %s <directory_input> %s <directory_output>\n", path_to_directory_input(argv),path_to_directory_output(argv));
         exit(EXIT_FAILURE);
     }
     
@@ -114,40 +114,28 @@ void close_directories(DIR *dir_input, DIR *dir_output){
     }
 }
 
-void bmp_convert_to_grey(int file_in, char *entry_name) {
-    struct stat file_stat;
+void bmp_convert_to_grey(int file_in, char *file_path) {
+  if(file_in == -1){
+    perror("Error opening image");
+    exit(EXIT_FAILURE);
+  }
+  char buffer[54];
+  if(read(file_in, buffer, 54) != 54){
+    perror("Eroare la citire!\n");
+    exit(EXIT_FAILURE);
+  }
+  unsigned char pixels[3];
+  lseek(file_in, 54, SEEK_SET);
 
-    if (fstat(file_in, &file_stat) == -1) {
-        perror("Eroare");
-        close(file_in);
-        exit(EXIT_FAILURE);
-    }
+  while(read(file_in, pixels, 3) == 3){
+    unsigned char p_gri = (unsigned char)(0.299 * pixels[2] + 0.587 * pixels[1] + 0.114 * pixels[0]);
 
-    char bmp_header[BMP_HEADER_SIZE];
-    int bytes_read = read(file_in, bmp_header, BMP_HEADER_SIZE);
+    lseek(file_in, -3, SEEK_CUR);
+    unsigned char grayPixel[3] = {p_gri, p_gri, p_gri};
+    write(file_in, grayPixel, 3);
+  }
 
-    unsigned int width = *(unsigned int *)&bmp_header[18];
-    unsigned int height = *(unsigned int *)&bmp_header[22];
-    unsigned int image_size = *(unsigned int *)&bmp_header[34];
-
-    lseek(file_in, BMP_HEADER_SIZE, SEEK_SET);
-
-    if (bytes_read == BMP_HEADER_SIZE && width > 0 && height > 0) {
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                unsigned char pixel[3];
-                read(file_in, pixel, sizeof(pixel));
-                lseek(file_in, -3, SEEK_CUR);
-
-                double grey = 0.299 * (double)pixel[0] + 0.587 * (double)pixel[1] + 0.114 * (double)pixel[2];
-                unsigned char grey_pixel[3] = {(unsigned char)grey, (unsigned char)grey, (unsigned char)grey};
-                write(file_in, grey_pixel, sizeof(grey_pixel));
-            }
-        }
-    }
-
-    close(file_in);
-    exit(EXIT_SUCCESS);
+  close(file_in);
 }
 
 void bmp_scriere_in_fisier(int file_in,int file_out,char* entry_name){
@@ -412,129 +400,44 @@ int main(int argc, char **argv) {
 
     struct stat file_stat;
 
-    char nume_fisier_statistica[500];
+    char nume_fisier_statistica[5000];
 
-    int file_out_specific=0;
+    int file_out_specific;
 
-    while ((entry = readdir(directory_input)) != NULL) {
-        
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) { //sarim peste . si ..
-            continue;
-        }
+   while ((entry = readdir(directory_input)) != NULL) {
+    int file_out_specific = 0;
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        continue;
+    }
 
-        char file_path[5000];
-        
-        snprintf(file_path, sizeof(file_path), "%s/%s", path_to_directory_input(argv), entry->d_name);
-        snprintf(nume_fisier_statistica, sizeof(nume_fisier_statistica), "%s/%s_statistica.txt", path_to_directory(argv), entry->d_name);
-        file_out_specific = open(nume_fisier_statistica, O_WRONLY | O_APPEND | O_CREAT);
-        
-        if (lstat(file_path, &file_stat) == -1) {
-            perror("Eroare la stat");
-            continue;  //merge la urmatorul fisier
-        }
-	
-	    if(S_ISLNK(file_stat.st_mode)){
-            
-            pid_t copil_link;
+    char file_path[5000];
+    snprintf(file_path, sizeof(file_path), "%s/%s", path_to_directory_input(argv), entry->d_name);
+    snprintf(nume_fisier_statistica, sizeof(nume_fisier_statistica), "%s/%s_statistica.txt", argv[2], entry->d_name);
+    file_out_specific = open(nume_fisier_statistica, O_WRONLY | O_APPEND | O_CREAT | O_RDONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR);
 
-            copil_link=fork();
+    if (lstat(file_path, &file_stat) == -1) {
+        perror("Eroare la stat");
+        continue;  // Skip to the next iteration
+    }
 
-            if(copil_link==0){
-                link_scriere_in_fisier(open(file_path, O_RDONLY),file_out_specific, entry->d_name,file_path);
-                execlp("wc", "wc", "-l", file_path, NULL);
-                exit(EXIT_SUCCESS);
-            }
-            else{
-                perror("Eroare la procesul copil al symlink!\n");
-                exit(EXIT_FAILURE);
-            }
+    if (S_ISLNK(file_stat.st_mode)) {
+        link_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name, file_path);
+	    continue;
+    } else if (S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")) {
+      //bmp_convert_to_grey(open(file_path, O_RDWR), file_path);
+      bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	  continue;
+    } else if (S_ISREG(file_stat.st_mode)) {
+        normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	    continue;
+    } else if (S_ISDIR(file_stat.st_mode)) {
+        director_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	    continue;
+    }
 
-            int status_link=0;
-            waitpid(copil_link, &status_link, 0);
-
-            if (WIFEXITED(status_link)) {
-            int lines = WEXITSTATUS(status_link);
-
-            printf("Copilul a numarat %d linii.\n", lines);
-	        continue;
-        }
-
-        if(S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")){
-            
-            pid_t copil_bmp_statis, copil_bmp_gri;
-
-            copil_bmp_statis=fork();
-
-            if(copil_bmp_statis==0){
-                bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-                execlp("wc", "wc", "-l", file_path, NULL);
-                exit(EXIT_SUCCESS);
-            }
-            else{
-                perror("Eroare la procesul copil statistica .bmp!\n");
-                exit(EXIT_FAILURE);
-            }
-
-            copil_bmp_gri=fork();
-            if(copil_bmp_statis==0){
-                bmp_convert_to_grey(open(file_path, O_RDONLY), entry->d_name);
-                exit(EXIT_SUCCESS);
-            }
-            else{
-                perror("Eroare la procesul copil conversie in gri .bmp!\n");
-                exit(EXIT_FAILURE);
-            }
-
-            continue;
-
-        }
-
-        if(S_ISREG(file_stat.st_mode)){
-            
-            pid_t copil_regular;
-
-            copil_regular=fork();
-
-            if(copil_regular==0){    
-                normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-                execlp("wc", "wc", "-l", file_path, NULL);
-                exit(EXIT_SUCCESS);
-            }
-            else{
-                perror("Eroare la procesul copil al regular file!\n");
-                exit(EXIT_FAILURE);
-            }
-            continue;
-
-        }
-        
-        if(S_ISDIR(file_stat.st_mode)){
-
-            pid_t copil_dir;
-
-            copil_dir=fork();
-
-            if(copil_dir==0){
-                director_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-                execlp("wc", "wc", "-l", file_path, NULL);
-                exit(EXIT_SUCCESS);
-            }
-            else{
-                perror("Eroare la procesul copil al director!\n");
-                exit(EXIT_FAILURE);
-            }
-            continue;
-        }
-
-        else{
-            printf("Tip de fisier necunoscut!\n");
-            exit(EXIT_FAILURE);
-        }
-        close_files(open(file_path, O_RDONLY), file_out_specific);
-        close_directories(directory_input,directory_output);
-    }   
-    closedir(directory_input);
     close(file_out_specific);
+   }
 
-    return 0;
+closedir(directory_input);
+ return 0;
 }
