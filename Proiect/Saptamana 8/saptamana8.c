@@ -465,12 +465,13 @@ int main(int argc, char **argv) {
 
        if(pid_link==0){
         link_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name, file_path);
-	lines=count_lines(file_out_specific);
-	exit(EXIT_SUCCESS);
+	    lines=count_lines(file_out_specific);
+	    close(file_out_specific);
+	    exit(EXIT_SUCCESS);
        }
        
        if(pid_link==-1){
-	 perror("Eroare la procesul copil al symlink!\n");
+	     perror("Eroare la procesul copil al symlink!\n");
          exit(EXIT_FAILURE);
        }
 	 
@@ -479,96 +480,99 @@ int main(int argc, char **argv) {
        pid_t pid_gata1 = waitpid(pid_link, &status1, 0);
        
       if(pid_gata1 == -1){
-	perror("Eroare la waitpid");
-	exit(EXIT_FAILURE);
+	    perror("Eroare la waitpid");
+	    exit(EXIT_FAILURE);
       }
 
       if(WIFEXITED(status1)){
-	    printf("S-a încheiat procesul cu pid-ul %d și nr de linii %d\n", getpid(), lines);
+	    printf("S-a încheiat procesul cu pid-ul %d , codul %d și nr de linii %d\n", getpid(),status1, lines);
 	    exit(lines);
        }
        child_count++;
-	    continue;
+	continue;
 	
     } else if (S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")) {
-        pid_bmp_statistica=fork();
+	  pid_bmp_statistica=fork();
 
-	    if(pid_bmp_statistica==0){
-	        bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-	        lines=count_lines(file_out_specific);
-	        exit(EXIT_SUCCESS);
-        }
+		if(pid_bmp_statistica==0){
+		  bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+		  lines=count_lines(file_out_specific);
+		  close(file_out_specific);
+		  exit(EXIT_SUCCESS);
+	 }
       
-        if(pid_bmp_statistica==-1){
-	        perror("Eroare la procesul copil statistica .bmp!\n");
-            exit(EXIT_FAILURE);
-        }
+	 if(pid_bmp_statistica==-1){
+		  perror("Eroare la procesul copil statistica .bmp!\n");
+	    exit(EXIT_FAILURE);
+	 }
       
-        int status2;
-        pid_t pid_gata2 = waitpid(pid_bmp_statistica, &status2, 0);
+	 int status2;
+	 pid_t pid_gata2 = waitpid(pid_bmp_statistica, &status2, 0);
        
-        if(pid_gata2 == -1){
-	        perror("Eroare la waitpid");
-	        exit(EXIT_FAILURE);
-      }
+	 if(pid_gata2 == -1){
+		perror("Eroare la waitpid");
+		exit(EXIT_FAILURE);
+	}
 
-        if(WIFEXITED(status2)){
-	        printf("S-a încheiat procesul cu pid-ul %d și nr_linii %d\n", getpid(), lines);
-	        exit(lines);
-        }
+	 if(WIFEXITED(status2)){
+		printf("S-a încheiat procesul cu pid-ul %d , codul %d și nr de linii %d\n", getpid(),status2, lines);
+		exit(lines);
+	 }
       
-        child_count++;
+	child_count++;
       
         pid_gri=fork();
 
-        if(pid_gri==0){
-            bmp_convert_to_grey(open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IROTH), file_path);
-	        exit(EXIT_SUCCESS);
+       if(pid_gri==0){
+	    bmp_convert_to_grey(open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IROTH), file_path);
+	    close(file_out_specific);
+	    exit(EXIT_SUCCESS);
         }     
-        if(pid_gri==-1){
-            perror("Eroare la procesul copil conversie in gri .bmp!\n");
-	        exit(EXIT_FAILURE);
-        }
+       if(pid_gri==-1){
+        perror("Eroare la procesul copil conversie in gri .bmp!\n");
+      	exit(EXIT_FAILURE);
+       }
         int status3;
         pid_t pid_gata3 = waitpid(pid_gri, &status3, 0);
        
         if(pid_gata3 == -1){
-	        perror("Eroare la waitpid");
-	        exit(EXIT_FAILURE);
-        }
+	  p error("Eroare la waitpid");
+	    exit(EXIT_FAILURE);
+       }
 
         if(WIFEXITED(status3)){
-	        printf("S-a încheiat procesul cu pid-ul %d\n", getpid());
-	        exit(EXIT_SUCCESS);
-        }
+		printf("S-a încheiat procesul cu pid-ul %d si codul %d \n", getpid(),status3);
+		exit(EXIT_SUCCESS);
+	  }
         child_count++;
-	        continue;
-	
-    } else if (S_ISREG(file_stat.st_mode)) {
+	    continue;
+    }	
+     else if (S_ISREG(file_stat.st_mode)) {
        pid_reg=fork();
 
        if(pid_reg==0){
-	        normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-	        lines=count_lines(file_out_specific);
-	        exit(EXIT_SUCCESS);
+	    normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	    lines=count_lines(file_out_specific);
+	    close(file_out_specific);
+	    exit(EXIT_SUCCESS);
        }
        if(pid_reg==-1){
                 perror("Eroare la procesul copil al regular file!\n");
                 exit(EXIT_FAILURE);
        }
        int status4;
-       pid_t pid_gata4 = waitpid(pid_reg, &status4, 0);
+      pid_t pid_gata4 = waitpid(pid_reg, &status4, 0);
        
-        if(pid_gata4 == -1){
-	        perror("Eroare la waitpid");
-	        exit(EXIT_FAILURE);
-        }
+      if(pid_gata4 == -1){
+	    perror("Eroare la waitpid");
+	    exit(EXIT_FAILURE);
+      }
 
-        if(WIFEXITED(status4)){
-	        printf("S-a încheiat procesul cu pid-ul %d și nr_linii %d\n", getpid(), lines);
-	        exit(EXIT_SUCCESS);
-        }
-        child_count++;
+      if(WIFEXITED(status4)){
+	    printf("S-a încheiat procesul cu pid-ul %d , codul %d și nr de linii %d\n", getpid(),status4, lines);
+	    exit(EXIT_SUCCESS);
+       }
+       child_count++;
 	    continue;
 	
     } else if (S_ISDIR(file_stat.st_mode)) {
@@ -577,32 +581,33 @@ int main(int argc, char **argv) {
        if(pid_dir==0){
 	    director_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
 	    lines=count_lines(file_out_specific);
+	    close(file_out_specific);
 	    exit(EXIT_SUCCESS);
        }
        if(pid_dir==-1){
                 perror("Eroare la procesul copil al director!\n");
                 exit(EXIT_FAILURE);
        }
-        int status5;
-        pid_t pid_gata5 = waitpid(pid_reg, &status5, 0);
+      int status5;
+      pid_t pid_gata5 = waitpid(pid_dir, &status5, 0);
        
-        if(pid_gata5 == -1){
-	        perror("Eroare la waitpid");
-	        exit(EXIT_FAILURE);
-        }
+      if(pid_gata5 == -1){
+	    perror("Eroare la waitpid");
+	    exit(EXIT_FAILURE);
+      }
 
-        if(WIFEXITED(status5)){
-	        printf("S-a încheiat procesul cu pid-ul %d și nr_linii %d\n", getpid(), lines);
-	        exit(EXIT_SUCCESS);
-        }
+      if(WIFEXITED(status5)){
+	    printf("S-a încheiat procesul cu pid-ul %d , codul %d și nr de linii %d\n", getpid(),status5, lines);
+	    exit(EXIT_SUCCESS);
+       }
         child_count++;
-	    continue;
+	continue;
     }
 
     close(file_out_specific);
    }
 
-    closedir(directory_input);
+closedir(directory_input);
  for (int i = 0; i < child_count; i++) {
      wait(NULL);
  }
