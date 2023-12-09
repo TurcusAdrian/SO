@@ -401,10 +401,10 @@ void link_scriere_in_fisier(int file_in,int file_out, char* entry_name, const ch
     write(file_out, drepturi_de_acces_altii, strlen(drepturi_de_acces_altii));
 }
 
-int count_lines(int file_in) {
-    if (file_in < 0) {
-        fprintf(stderr, "Descriptor invalid de fisier\n");
-        return -1;
+int count_lines(int file_out) {
+    if (file_out < 0) {
+        perror("Descriptor invalid de fisier\n");
+        exit(EXIT_FAILURE);
     }
 
     int line_count = 0;
@@ -412,7 +412,7 @@ int count_lines(int file_in) {
     ssize_t read_result;
 
     
-    while ((read_result = read(file_in, buffer, sizeof(buffer))) > 0) {
+    while ((read_result = read(file_out, buffer, sizeof(buffer))) > 0) {
         if (buffer[0] == '\n') {
             line_count++;
         }
@@ -420,6 +420,8 @@ int count_lines(int file_in) {
 
     return line_count;
 }
+
+
 
 int main(int argc, char **argv) {
 
@@ -448,7 +450,7 @@ int main(int argc, char **argv) {
 
     char file_path[5000];
     snprintf(file_path, sizeof(file_path), "%s/%s", path_to_directory_input(argv), entry->d_name);
-    snprintf(nume_fisier_statistica, sizeof(nume_fisier_statistica), "%s/%s_statistica.txt", argv[2], entry->d_name);
+    snprintf(nume_fisier_statistica, sizeof(nume_fisier_statistica), "%s/%s_statistica.txt", path_to_directory_output(argv), entry->d_name);
     file_out_specific = open(nume_fisier_statistica, O_WRONLY | O_APPEND | O_CREAT | O_RDONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR);
 
     if (lstat(file_path, &file_stat) == -1) {
@@ -456,77 +458,143 @@ int main(int argc, char **argv) {
         continue;  // Skip to the next iteration
     }
     
-    pid_t pid;
+    pid_t pid_link, pid_bmp_statistica, pid_gri, pid_reg, pid_dir;
 
     if (S_ISLNK(file_stat.st_mode)) {
-           pid=fork();
+       pid_link=fork();
 
-       if(pid==0){
-	    lines=count_lines(open(file_path, O_RDONLY));
+       if(pid_link==0){
         link_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name, file_path);
-	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
-	    exit(lines);
+	lines=count_lines(file_out_specific);
+	exit(EXIT_SUCCESS);
        }
-       else{
-            perror("Eroare la procesul copil al symlink!\n");
-            exit(EXIT_FAILURE);
+       
+       if(pid_link==-1){
+	 perror("Eroare la procesul copil al symlink!\n");
+         exit(EXIT_FAILURE);
+       }
+	 
+       
+       int status1;
+       pid_t pid_gata1 = waitpid(pid_link, &status1, 0);
+       
+      if(pid_gata1 == -1){
+	perror("Eroare la waitpid");
+	exit(EXIT_FAILURE);
+      }
+
+      if(WIFEXITED(status1)){
+	    printf("S-a încheiat procesul cu pid-ul %d și nr de linii %d\n", getpid(), lines);
+	    exit(lines);
        }
        child_count++;
 	    continue;
+	
     } else if (S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")) {
-      pid=fork();
+        pid_bmp_statistica=fork();
 
-      if(pid==0){
-	    lines=count_lines(open(file_path, O_RDONLY));
-	    bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
-	    exit(lines);
+	    if(pid_bmp_statistica==0){
+	        bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	        lines=count_lines(file_out_specific);
+	        exit(EXIT_SUCCESS);
+        }
+      
+        if(pid_bmp_statistica==-1){
+	        perror("Eroare la procesul copil statistica .bmp!\n");
+            exit(EXIT_FAILURE);
+        }
+      
+        int status2;
+        pid_t pid_gata2 = waitpid(pid_bmp_statistica, &status2, 0);
+       
+        if(pid_gata2 == -1){
+	        perror("Eroare la waitpid");
+	        exit(EXIT_FAILURE);
       }
-      else{
-                perror("Eroare la procesul copil statistica .bmp!\n");
-                exit(EXIT_FAILURE);
-      }
-      //pid=fork();
-      //if(pid==0){
-      //	lines=count_lines(open(file_path, O_RDONLY));
-      //	bmp_convert_to_grey(open(file_path, O_RDWR,O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH), file_path);
-      //	printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
-      //	exit(lines);
-      //}     
-      // else{
-      //          perror("Eroare la procesul copil conversie in gri .bmp!\n");
-		//          exit(EXIT_FAILURE);
-      //}
-      child_count++;
-	    continue;
+
+        if(WIFEXITED(status2)){
+	        printf("S-a încheiat procesul cu pid-ul %d și nr_linii %d\n", getpid(), lines);
+	        exit(lines);
+        }
+      
+        child_count++;
+      
+        pid_gri=fork();
+
+        if(pid_gri==0){
+            bmp_convert_to_grey(open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IROTH), file_path);
+	        exit(EXIT_SUCCESS);
+        }     
+        if(pid_gri==-1){
+            perror("Eroare la procesul copil conversie in gri .bmp!\n");
+	        exit(EXIT_FAILURE);
+        }
+        int status3;
+        pid_t pid_gata3 = waitpid(pid_gri, &status3, 0);
+       
+        if(pid_gata3 == -1){
+	        perror("Eroare la waitpid");
+	        exit(EXIT_FAILURE);
+        }
+
+        if(WIFEXITED(status3)){
+	        printf("S-a încheiat procesul cu pid-ul %d\n", getpid());
+	        exit(EXIT_SUCCESS);
+        }
+        child_count++;
+	        continue;
+	
     } else if (S_ISREG(file_stat.st_mode)) {
-       pid=fork();
+       pid_reg=fork();
 
-       if(pid==0){
-	    lines=count_lines(open(file_path, O_RDONLY));
-	    normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
-	    exit(lines);
+       if(pid_reg==0){
+	        normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	        lines=count_lines(file_out_specific);
+	        exit(EXIT_SUCCESS);
        }
-       else{
+       if(pid_reg==-1){
                 perror("Eroare la procesul copil al regular file!\n");
                 exit(EXIT_FAILURE);
        }
-       child_count++;
-	    continue;
-    } else if (S_ISDIR(file_stat.st_mode)) {
-       pid=fork();
+       int status4;
+       pid_t pid_gata4 = waitpid(pid_reg, &status4, 0);
+       
+        if(pid_gata4 == -1){
+	        perror("Eroare la waitpid");
+	        exit(EXIT_FAILURE);
+        }
 
-       if(pid==0){
-	    lines=count_lines(open(file_path, O_RDONLY));
+        if(WIFEXITED(status4)){
+	        printf("S-a încheiat procesul cu pid-ul %d și nr_linii %d\n", getpid(), lines);
+	        exit(EXIT_SUCCESS);
+        }
+        child_count++;
+	    continue;
+	
+    } else if (S_ISDIR(file_stat.st_mode)) {
+       pid_dir=fork();
+
+       if(pid_dir==0){
 	    director_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
-	    exit(lines);
+	    lines=count_lines(file_out_specific);
+	    exit(EXIT_SUCCESS);
        }
-       else{
+       if(pid_dir==-1){
                 perror("Eroare la procesul copil al director!\n");
                 exit(EXIT_FAILURE);
-            }
+       }
+        int status5;
+        pid_t pid_gata5 = waitpid(pid_reg, &status5, 0);
+       
+        if(pid_gata5 == -1){
+	        perror("Eroare la waitpid");
+	        exit(EXIT_FAILURE);
+        }
+
+        if(WIFEXITED(status5)){
+	        printf("S-a încheiat procesul cu pid-ul %d și nr_linii %d\n", getpid(), lines);
+	        exit(EXIT_SUCCESS);
+        }
         child_count++;
 	    continue;
     }
@@ -534,9 +602,9 @@ int main(int argc, char **argv) {
     close(file_out_specific);
    }
 
-closedir(directory_input);
+    closedir(directory_input);
  for (int i = 0; i < child_count; i++) {
-        wait(NULL);
-    }
+     wait(NULL);
+ }
  return 0;
 }
