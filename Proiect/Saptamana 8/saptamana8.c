@@ -2,12 +2,13 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <dirent.h>
-
+#include <stdint.h>
 #define BMP_HEADER_SIZE 54
 
 typedef struct {
@@ -114,33 +115,45 @@ void close_directories(DIR *dir_input, DIR *dir_output){
     }
 }
 
-void bmp_convert_to_grey(int file_in, char *file_path) {
-  if(file_in == -1){
-    perror("Error opening image");
-    exit(EXIT_FAILURE);
-  }
-  char buffer[54];
-  if(read(file_in, buffer, 54) != 54){
-    perror("Eroare la citire!\n");
-    exit(EXIT_FAILURE);
-  }
-  unsigned char pixels[3];
-  lseek(file_in, 54, SEEK_SET);
+void bmp_convert_to_grey(int file_in,char *file_path) {
+    
+    if (file_in == -1) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
 
-  while(read(file_in, pixels, 3) == 3){
-    unsigned char p_gri = (unsigned char)(0.299 * pixels[2] + 0.587 * pixels[1] + 0.114 * pixels[0]);
+    char bmp_header[BMP_HEADER_SIZE];
+    int bytes_read = read(file_in, bmp_header, BMP_HEADER_SIZE);
 
-    lseek(file_in, -3, SEEK_CUR);
-    unsigned char grayPixel[3] = {p_gri, p_gri, p_gri};
-    write(file_in, grayPixel, 3);
-  }
+    unsigned int width = *(unsigned int *)&bmp_header[18];
+    unsigned int height = *(unsigned int *)&bmp_header[22];
+    unsigned int image_size = *(unsigned int *)&bmp_header[34];
 
-  close(file_in);
+    if (bytes_read == BMP_HEADER_SIZE && width > 0 && height > 0) {
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                unsigned char pixel[3];
+                read(file_in, pixel, sizeof(pixel));
+
+                double grey = 0.299 * (double)pixel[0] + 0.587 * (double)pixel[1] + 0.114 * (double)pixel[2];
+                unsigned char grey_pixel[3] = {(unsigned char)grey, (unsigned char)grey, (unsigned char)grey};
+                
+                
+                lseek(file_in, -3, SEEK_CUR);
+
+               
+                write(file_in, grey_pixel, sizeof(grey_pixel));
+            }
+        }
+    }
+
+
+    close(file_in);
 }
 
 void bmp_scriere_in_fisier(int file_in,int file_out,char* entry_name){
-
-
+  
+  
     struct stat file_stat;
 
     if (fstat(file_in, &file_stat) == -1) {
@@ -388,6 +401,25 @@ void link_scriere_in_fisier(int file_in,int file_out, char* entry_name, const ch
     write(file_out, drepturi_de_acces_altii, strlen(drepturi_de_acces_altii));
 }
 
+int count_lines(int file_in) {
+    if (file_in < 0) {
+        fprintf(stderr, "Descriptor invalid de fisier\n");
+        return -1;
+    }
+
+    int line_count = 0;
+    char buffer[1];
+    ssize_t read_result;
+
+    
+    while ((read_result = read(file_in, buffer, sizeof(buffer))) > 0) {
+        if (buffer[0] == '\n') {
+            line_count++;
+        }
+    }
+
+    return line_count;
+}
 
 int main(int argc, char **argv) {
 
@@ -404,6 +436,10 @@ int main(int argc, char **argv) {
 
     int file_out_specific;
 
+    int lines=0;
+
+    int child_count=0;
+    
    while ((entry = readdir(directory_input)) != NULL) {
     int file_out_specific = 0;
     if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
@@ -419,19 +455,79 @@ int main(int argc, char **argv) {
         perror("Eroare la stat");
         continue;  // Skip to the next iteration
     }
+    
+    pid_t pid;
 
     if (S_ISLNK(file_stat.st_mode)) {
+           pid=fork();
+
+       if(pid==0){
+	    lines=count_lines(open(file_path, O_RDONLY));
         link_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name, file_path);
+	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
+	    exit(lines);
+       }
+       else{
+            perror("Eroare la procesul copil al symlink!\n");
+            exit(EXIT_FAILURE);
+       }
+       child_count++;
 	    continue;
     } else if (S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")) {
-      //bmp_convert_to_grey(open(file_path, O_RDWR), file_path);
-      bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
-	  continue;
+      pid=fork();
+
+      if(pid==0){
+	    lines=count_lines(open(file_path, O_RDONLY));
+	    bmp_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
+	    exit(lines);
+      }
+      else{
+                perror("Eroare la procesul copil statistica .bmp!\n");
+                exit(EXIT_FAILURE);
+      }
+      //pid=fork();
+      //if(pid==0){
+      //	lines=count_lines(open(file_path, O_RDONLY));
+      //	bmp_convert_to_grey(open(file_path, O_RDWR,O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH), file_path);
+      //	printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
+      //	exit(lines);
+      //}     
+      // else{
+      //          perror("Eroare la procesul copil conversie in gri .bmp!\n");
+		//          exit(EXIT_FAILURE);
+      //}
+      child_count++;
+	    continue;
     } else if (S_ISREG(file_stat.st_mode)) {
-        normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+       pid=fork();
+
+       if(pid==0){
+	    lines=count_lines(open(file_path, O_RDONLY));
+	    normal_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
+	    exit(lines);
+       }
+       else{
+                perror("Eroare la procesul copil al regular file!\n");
+                exit(EXIT_FAILURE);
+       }
+       child_count++;
 	    continue;
     } else if (S_ISDIR(file_stat.st_mode)) {
-        director_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+       pid=fork();
+
+       if(pid==0){
+	    lines=count_lines(open(file_path, O_RDONLY));
+	    director_scriere_in_fisier(open(file_path, O_RDONLY), file_out_specific, entry->d_name);
+	    printf("S-a încheiat procesul cu pid-ul %d și codul(nr_linii) %d\n", getpid(), lines);
+	    exit(lines);
+       }
+       else{
+                perror("Eroare la procesul copil al director!\n");
+                exit(EXIT_FAILURE);
+            }
+        child_count++;
 	    continue;
     }
 
@@ -439,5 +535,8 @@ int main(int argc, char **argv) {
    }
 
 closedir(directory_input);
+ for (int i = 0; i < child_count; i++) {
+        wait(NULL);
+    }
  return 0;
 }
